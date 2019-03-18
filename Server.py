@@ -1,28 +1,46 @@
+from threading import *
 from socket import *
+from time import *
+from ast import *
 
-def Server():	
-	con, caddr = sock.accept()
-	print('accept')
-	while True:
-		msg = con.recv(1024).decode()
-		if not msg:
+def Server(con, caddr):		
+	#msg = dict()
+
+	while True:		
+		try:
+			msg = literal_eval("{" + con.recv(1024).decode()+ "}")						
+			print(msg)
+			for k, v in msg.items():
+				print(k)
+				d[k].sendall((str(caddr) + " : '" + v + "'").encode())
+			#con.sendall(msg.encode())
+		except Exception as e:
+			for c in d.values():
+				c.sendall(("'disconnect' : " + str(caddr)).encode())
+			del d[caddr]
+			print(e)
 			break
-		print(msg)
-		msg = input('Msg : ')
-		con.sendall(msg.encode())
+	con.close()	
 		
-HOST = ''
-PORT = 8080
-BUFSIZE = 1024
-ADDR = (HOST, PORT)
-
-sock = socket()
-
-sock.bind(ADDR)
-print('bind')
-sock.listen(2)
-print('listen')
-while True:	
-	Server()
-
-con.close()
+if __name__ == '__main__':	
+	d = dict()
+	HOST = ''
+	PORT = 8080
+	BUFSIZE = 1024
+	ADDR = (HOST, PORT)
+	sock = socket()
+	sock.bind(ADDR)
+	while True:
+		sock.listen(1)
+		con, caddr = sock.accept()
+		
+		for k in d.keys():
+			print("'connect' : " + str(k))
+			con.sendall(("'connect' : " + str(k)).encode())
+			sleep(0.01)
+		d[caddr] = con
+		for c in d.values():			
+			c.sendall(("'connect' : " + str(caddr)).encode())
+		print('connect')		
+		t = Thread(target=Server, args=(con, caddr))		
+		t.start()
