@@ -8,18 +8,22 @@ def Server(con, caddr):
 
 	while True:		
 		try:
+			print("...Ing")
 			msg = literal_eval("{" + con.recv(1024).decode()+ "}")						
 			print(msg)
 			for k, v in msg.items():
 				print(k)
 				d[k].sendall((str(caddr) + " : '" + v + "'").encode())
 			#con.sendall(msg.encode())
-		except Exception as e:
+		except:
 			for c in d.values():
-				c.sendall(("'disconnect' : " + str(caddr)).encode())
+				try:
+					c.sendall(("'disconnect' : " + str(caddr)).encode())
+				except:
+					break
 			del d[caddr]
-			print(e)
 			break
+		
 	con.close()	
 		
 if __name__ == '__main__':	
@@ -33,9 +37,7 @@ if __name__ == '__main__':
 	while True:
 		sock.listen(1)
 		con, caddr = sock.accept()
-		
 		for k in d.keys():
-			print("'connect' : " + str(k))
 			con.sendall(("'connect' : " + str(k)).encode())
 			sleep(0.01)
 		d[caddr] = con
