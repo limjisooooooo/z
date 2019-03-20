@@ -3,25 +3,29 @@ from socket import *
 from time import *
 from ast import *
 
-def Server(con, caddr):		
+def Server(con, id):		
 	#msg = dict()
 
 	while True:		
 		try:
-			print("...Ing")
-			msg = literal_eval("{" + con.recv(1024).decode()+ "}")						
-			print(msg)
+			#print(msg)
+			msg = literal_eval("{" + con.recv(1024).decode()+ "}")			
 			for k, v in msg.items():
-				print(k)
-				d[k].sendall((str(caddr) + " : '" + v + "'").encode())
+				if k == 'BroadCast':
+					for ck, c in d.items():
+						if ck == id :
+							continue
+						c.sendall(("'" + id + "' : '" + v + "'").encode())
+				else:
+					d[k].sendall(("'" + id + "' : '" + v + "'").encode())
 			#con.sendall(msg.encode())
 		except:
 			for c in d.values():
-				try:
-					c.sendall(("'disconnect' : " + str(caddr)).encode())
+				try:					
+					c.sendall(("'disconnect' : '" + id + "'").encode())
 				except:
-					break
-			del d[caddr]
+					continue
+			del d[id]
 			break
 		
 	con.close()	
@@ -37,12 +41,21 @@ if __name__ == '__main__':
 	while True:
 		sock.listen(1)
 		con, caddr = sock.accept()
+		id = con.recv(1024).decode()
+		if id in d.keys():
+			con.sendall("False".encode())
+			con.close()
+			continue
+		con.sendall("True".encode())
+			
 		for k in d.keys():
-			con.sendall(("'connect' : " + str(k)).encode())
+			con.sendall(("'connect' : '" + str(k) + "'").encode())
 			sleep(0.01)
-		d[caddr] = con
+			
+		d[id] = con
+		
 		for c in d.values():			
-			c.sendall(("'connect' : " + str(caddr)).encode())
+			c.sendall(("'connect' : '" + id + "'").encode())
 		print('connect')		
-		t = Thread(target=Server, args=(con, caddr))		
+		t = Thread(target=Server, args=(con, id))		
 		t.start()

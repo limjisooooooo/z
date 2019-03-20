@@ -1,7 +1,6 @@
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from PyQt5.uic import *
 from socket import *
 from PyQt5.QtCore import QThread
 from ast import *
@@ -22,33 +21,79 @@ class Receive(QThread):
 			for k, v in d.items():
 				if k == 'connect':
 					self.parent.model.appendRow(QStandardItem(str(v)))
-					self.parent.ui.listView.setModel(self.parent.model)	
+					self.parent.listView.setModel(self.parent.model)	
 				elif k == 'disconnect':
+					print(self.parent.model.findItems(str(v))[0].row())					
 					self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
+					
 				else:
-					self.parent.ui.textBrowser.append(str(k) + " 님의 말 : " + v)
+					self.parent.textBrowser.append("From. " + str(k) + " : " + v)
+class Enter(QDialog):
+	def __init__(self, parent):
+		super().__init__()
+		self.parent = parent
+		#self.setGeometry(300, 200, 150, 30)
+		
+		self.txtName = QLineEdit(self)
+		self.txtName.setGeometry(20, 10, 100, 20)
+
+		self.btnOk = QPushButton(self)
+		self.btnOk.setGeometry(130, 10, 50, 20)
+		self.btnOk.setText("Enter")
+		self.show()
+		self.btnOk.clicked.connect(self.Enter_Form)
+	
+	def Enter_Form(self):
+		self.parent.id = self.txtName.text()
+		self.parent.__Main__Init__()
+		self.close()
+		
 class Form(QMainWindow):
 	def __init__(self):
 		super().__init__()
-		self.ui = loadUi("Form.ui")		
-		self.ui.show()
-		self.ui.lineEdit.returnPressed.connect(self.send)
-		self.ui.setWindowTitle('Chat')
+		self.id = ""
+		self.ent = Enter(self)
+	
+	def __Main__Init__(self):
+		self.textBrowser = QTextBrowser(self)
+		self.textBrowser.setGeometry(0, 0, 471, 401)
+		self.textBrowser.resize(471, 401)
+		
+		self.lineEdit = QLineEdit(self)
+		self.lineEdit.setGeometry(0, 410, 471, 31)
+		
+		self.listView = QListView(self)
+		self.listView.setGeometry(480, 0, 141, 441)		
+		
+		self.setGeometry(300, 200, 624, 482)		
+		self.setFixedSize(624, 482)
+		self.setWindowTitle('Chat')
+		self.show()
+		
+		self.lineEdit.returnPressed.connect(self.send)		
 		self.model = QStandardItemModel()		
+		
 		self.sock = socket()
 		self.sock.connect(('172.2.33.8', 8080))
+		self.sock.sendall(self.id.encode())
+		if self.sock.recv(1024).decode() == "False":
+			self.err = QErrorMessage(self)
+			self.err.showMessage("Id 중복 Error!")
+			#self.close()
+			self.err.accepted.connect(self.close)
 		self.rec = Receive(self)
-		self.rec.start()		
-	def send(self):
-		if self.ui.listView.selectedIndexes():			
-			self.sock.sendall((self.model.itemData(self.ui.listView.selectedIndexes()[0])[0] + " : '" + self.ui.lineEdit.text() + "'").encode())
-			self.ui.textBrowser.append(self.ui.lineEdit.text())
-			self.ui.lineEdit.setText("")
-	
-	def __del__(self):
-		self.sock.close()
+		self.rec.start()
 		
+	def send(self):
+		if self.listView.selectedIndexes():			
+			self.sock.sendall(("'" +self.model.itemData(self.listView.selectedIndexes()[0])[0] + "' : '" + self.lineEdit.text() + "'").encode())
+			self.textBrowser.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
+		else:
+			self.sock.sendall(("'BroadCast' : '" + self.lineEdit.text() + "'").encode())
+			self.textBrowser.append("To. All User : " + self.lineEdit.text())
+		self.lineEdit.setText("")		
+
 if __name__ == '__main__':
-	app = QApplication(sys.argv)
+	app = QApplication(sys.argv)	
 	w = Form()
 	sys.exit(app.exec())
