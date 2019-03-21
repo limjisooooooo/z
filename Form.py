@@ -27,7 +27,13 @@ class Receive(QThread):
 					self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
 					
 				else:
-					self.parent.textBrowser.append("From. " + str(k) + " : " + v)
+					self.parent.textW.append("From. " + str(k) + " : " + v)										
+					sleep(0.01)
+					self.parent.bar.setValue(self.parent.bar.maximum())
+					self.parent.textW.viewport().update()
+					
+					
+					
 class Enter(QDialog):
 	def __init__(self, parent):
 		super().__init__()
@@ -55,9 +61,13 @@ class Form(QMainWindow):
 		self.ent = Enter(self)
 	
 	def __Main__Init__(self):
-		self.textBrowser = QTextBrowser(self)
-		self.textBrowser.setGeometry(0, 0, 471, 401)
-		self.textBrowser.resize(471, 401)
+		self.textW = QTextEdit(self)
+		self.textW.setGeometry(0, 0, 471, 401)
+		self.textW.setReadOnly(True)
+		self.textW.setLineWrapMode(False)
+		
+		self.bar = QScrollBar(0x2, self)
+		self.textW.setVerticalScrollBar(self.bar)
 		
 		self.lineEdit = QLineEdit(self)
 		self.lineEdit.setGeometry(0, 410, 471, 31)
@@ -74,7 +84,7 @@ class Form(QMainWindow):
 		self.model = QStandardItemModel()		
 		
 		self.sock = socket()
-		self.sock.connect(('172.2.33.8', 8080))
+		self.sock.connect(('180.228.77.83', 8080))
 		self.sock.sendall(self.id.encode())
 		if self.sock.recv(1024).decode() == "False":
 			self.err = QErrorMessage(self)
@@ -87,10 +97,11 @@ class Form(QMainWindow):
 	def send(self):
 		if self.listView.selectedIndexes():			
 			self.sock.sendall(("'" +self.model.itemData(self.listView.selectedIndexes()[0])[0] + "' : '" + self.lineEdit.text() + "'").encode())
-			self.textBrowser.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
+			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
 		else:
 			self.sock.sendall(("'BroadCast' : '" + self.lineEdit.text() + "'").encode())
-			self.textBrowser.append("To. All User : " + self.lineEdit.text())
+			self.textW.append("To. All User : " + self.lineEdit.text())
+		self.bar.setValue(self.bar.maximum())
 		self.lineEdit.setText("")		
 
 if __name__ == '__main__':
