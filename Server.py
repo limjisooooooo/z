@@ -9,20 +9,20 @@ def Server(con, id):
 	while True:		
 		try:
 			#print(msg)
-			msg = literal_eval("{" + con.recv(1024).decode()+ "}")			
+			msg = literal_eval(con.recv(1024).decode())			
 			for k, v in msg.items():
 				if k == 'BroadCast':
 					for ck, c in d.items():
 						if ck == id :
 							continue
-						c.sendall(("'" + id + "' : '" + v + "'").encode())
+						c.sendall(("{'" + id + "' : '" + v + "'}").encode())
 				else:
-					d[k].sendall(("'" + id + "' : '" + v + "'").encode())
+					d[k].sendall(("{'" + id + "' : '" + v + "'}").encode())
 			#con.sendall(msg.encode())
 		except:
 			for c in d.values():
 				try:					
-					c.sendall(("'disconnect' : '" + id + "'").encode())
+					c.sendall(("{'disconnect' : '" + id + "'}").encode())
 				except:
 					continue
 			del d[id]
@@ -33,7 +33,7 @@ def Server(con, id):
 if __name__ == '__main__':	
 	d = dict()
 	HOST = ''
-	PORT = 8080
+	PORT = 1036
 	BUFSIZE = 1024
 	ADDR = (HOST, PORT)
 	sock = socket()
@@ -49,13 +49,12 @@ if __name__ == '__main__':
 		con.sendall("True".encode())
 			
 		for k in d.keys():
-			con.sendall(("'connect' : '" + str(k) + "'").encode())
-			sleep(0.01)
+			con.sendall(("{'connect' : '" + str(k) + "'}").encode())			
 			
 		d[id] = con
 		
 		for c in d.values():			
-			c.sendall(("'connect' : '" + id + "'").encode())
-		print('connect')		
+			c.sendall(("{'connect' : '" + id + "'}").encode())
+		print('connect', con, id)		
 		t = Thread(target=Server, args=(con, id))		
 		t.start()

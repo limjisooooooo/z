@@ -16,21 +16,23 @@ class Receive(QThread):
 		
 	def run(self):
 		d = dict()
-		while True:			
-			d = literal_eval("{" + self.parent.sock.recv(1024).decode() + "}")
-			for k, v in d.items():
-				if k == 'connect':
-					self.parent.model.appendRow(QStandardItem(str(v)))
-					self.parent.listView.setModel(self.parent.model)	
-				elif k == 'disconnect':
-					print(self.parent.model.findItems(str(v))[0].row())					
-					self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
-					
-				else:
-					self.parent.textW.append("From. " + str(k) + " : " + v)										
-					sleep(0.01)
-					self.parent.bar.setValue(self.parent.bar.maximum())
-					self.parent.textW.viewport().update()
+		while True:
+			buff = self.parent.sock.recv(1024).decode()
+			while buff.find('}') != -1:				
+				d = literal_eval(buff[:buff.find('}')+1])
+				buff = buff[buff.find('}')+1:]
+				for k, v in d.items():
+					if k == 'connect':
+						self.parent.model.appendRow(QStandardItem(str(v)))
+						self.parent.listView.setModel(self.parent.model)	
+					elif k == 'disconnect':
+						print(self.parent.model.findItems(str(v))[0].row())					
+						self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
+						
+					else:
+						self.parent.textW.append("From. " + str(k) + " : " + v)										
+						self.parent.bar.setValue(self.parent.bar.maximum())
+						self.parent.textW.viewport().update()
 					
 					
 					
@@ -84,7 +86,7 @@ class Form(QMainWindow):
 		self.model = QStandardItemModel()		
 		
 		self.sock = socket()
-		self.sock.connect(('180.228.77.83', 8080))
+		self.sock.connect(('180.228.77.83', 1036))
 		self.sock.sendall(self.id.encode())
 		if self.sock.recv(1024).decode() == "False":
 			self.err = QErrorMessage(self)
@@ -96,10 +98,10 @@ class Form(QMainWindow):
 		
 	def send(self):
 		if self.listView.selectedIndexes():			
-			self.sock.sendall(("'" +self.model.itemData(self.listView.selectedIndexes()[0])[0] + "' : '" + self.lineEdit.text() + "'").encode())
+			self.sock.sendall(("{'" +self.model.itemData(self.listView.selectedIndexes()[0])[0] + "' : '" + self.lineEdit.text() + "'}").encode())
 			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
 		else:
-			self.sock.sendall(("'BroadCast' : '" + self.lineEdit.text() + "'").encode())
+			self.sock.sendall(("{'BroadCast' : '" + self.lineEdit.text() + "'}").encode())
 			self.textW.append("To. All User : " + self.lineEdit.text())
 		self.bar.setValue(self.bar.maximum())
 		self.lineEdit.setText("")		
