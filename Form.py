@@ -1,4 +1,5 @@
 import sys
+import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from socket import *
@@ -6,6 +7,29 @@ from PyQt5.QtCore import QThread
 from ast import *
 from time import *
 
+class Packet:
+	def __init__(caddr = None, id = None, status = None, s = None, jsn = None):
+		self.pd = dict()
+		self.pd['caddr'] = caddr
+		self.pd['id'] = id
+		self.pd['status'] = status
+		self.pd['s'] = s
+		self.jsn = jsn		
+	def dumps():
+		return json.dumps(self.pd)		
+	def loads():
+		return json.loads(jsn)	
+	def setCaddr(Caddr):
+		self.pd['caddr'] = caddr
+	def setId(id):
+		self.pd['id'] = id
+	def setStatus(status):
+		self.pd['status'] = status
+	def setS(s):
+		self.pd['s'] = s
+		
+
+		
 class Receive(QThread):
 	def __init__(self, parent):
 		super().__init__()
@@ -25,14 +49,15 @@ class Receive(QThread):
 					if k == 'connect':
 						self.parent.model.appendRow(QStandardItem(str(v)))
 						self.parent.listView.setModel(self.parent.model)	
+						self.parent.textW.append("Enter. " + v )
 					elif k == 'disconnect':
 						print(self.parent.model.findItems(str(v))[0].row())					
 						self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
-						
+						self.parent.textW.append("Leave. " + v )						
 					else:
 						self.parent.textW.append("From. " + str(k) + " : " + v)										
-						self.parent.bar.setValue(self.parent.bar.maximum())
-						self.parent.textW.viewport().update()
+					self.parent.bar.setValue(self.parent.bar.maximum())
+					self.parent.textW.viewport().update()
 					
 					
 					
