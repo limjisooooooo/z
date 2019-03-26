@@ -3,35 +3,69 @@ from socket import *
 from time import *
 from ast import *
 
-def Server(con, id):		
-	#msg = dict()
+from packet import *
+import re
 
+def Server(con, caddr):		
+	#msg = dict()	
+	r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 'status':.+?, 's':.+?}")
+	id = str()
 	while True:		
 		try:
-			#print(msg)
-			msg = literal_eval(con.recv(1024).decode())			
-			for k, v in msg.items():
-				if k == 'BroadCast':
-					for ck, c in d.items():
-						if ck == id :
-							continue
-						c.sendall(("{'" + id + "' : '" + v + "'}").encode())
+			buf = str()			
+			while r.search(buf) == None:
+				buf += con.recv(1024).decode()
+			msg = r.search(buf).group()
+			md = literal_eval(msg)
+			print(md)
+			buf = buf[r.search(buf).end():]
+			if md['status'] == 'connect':
+				if md['s'] in idic.keys():					
+					md['status'] = 'False'
+					md['s'] = 'Id Duplicate Error'
+					print(md)
+					con.sendall(str(md).encode())
+					break
+				
+				id = md['s']
+				
+				for c in d.values():					
+					c.sendall(msg.encode())				
+				
+				d[caddr] = con
+				#print(d[caddr])
+				idic[id] = caddr
+				#print(idic[id])
+				
+				for i in idic.keys():
+					md['s'] = i
+					con.sendall(str(md).encode())
+				
+			elif md['status'] == 'text':
+				if md['dstid'] == 'BroadCast':
+					for c in d.values():
+						if c != con :							
+							c.sendall(msg.encode())
 				else:
-					d[k].sendall(("{'" + id + "' : '" + v + "'}").encode())
-			#con.sendall(msg.encode())
+					d[idic[md['dstid']]].sendall(msg.encode())
+
 		except:
+			#print("엥 왜 실행?")
 			for c in d.values():
-				try:					
-					c.sendall(("{'disconnect' : '" + id + "'}").encode())
+				try:
+					p = Packet('', '', '', '', 'disconnect', id) 
+					c.sendall(p.DictoS().encode())
 				except:
 					continue
-			del d[id]
-			break
-		
+			del idic[id]
+			#print(id)
+			del d[caddr]
+			break		
 	con.close()	
 		
 if __name__ == '__main__':	
 	d = dict()
+	idic = dict()
 	HOST = ''
 	PORT = 1036
 	BUFSIZE = 1024
@@ -41,20 +75,20 @@ if __name__ == '__main__':
 	while True:
 		sock.listen(1)
 		con, caddr = sock.accept()
-		id = con.recv(1024).decode()
-		if id in d.keys():
-			con.sendall("False".encode())
-			con.close()
-			continue
-		con.sendall("True".encode())
+		#id = con.recv(1024).decode()
+		#if id in d.keys():
+		#	con.sendall("False".encode())
+		#	con.close()
+		#	continue
+		#con.sendall("True".encode())
 			
-		for k in d.keys():
-			con.sendall(("{'connect' : '" + str(k) + "'}").encode())			
+		#for k in d.keys():
+		#	con.sendall(("{'connect' : '" + str(k) + "'}").encode())			
 			
-		d[id] = con
+		#d[caddr] = con
 		
-		for c in d.values():			
-			c.sendall(("{'connect' : '" + id + "'}").encode())
-		print('connect', con, id)		
-		t = Thread(target=Server, args=(con, id))		
+		#for c in d.values():			
+		#	c.sendall(("{'connect' : '" + id + "'}").encode())
+		#print('connect', con, id)		
+		t = Thread(target=Server, args=(con, caddr))		
 		t.start()

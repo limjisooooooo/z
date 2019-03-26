@@ -1,34 +1,13 @@
 import sys
 import json
+import re
+from packet import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from socket import *
 from PyQt5.QtCore import QThread
 from ast import *
 from time import *
-
-class Packet:
-	def __init__(caddr = None, id = None, status = None, s = None, jsn = None):
-		self.pd = dict()
-		self.pd['caddr'] = caddr
-		self.pd['id'] = id
-		self.pd['status'] = status
-		self.pd['s'] = s
-		self.jsn = jsn		
-	def dumps():
-		return json.dumps(self.pd)		
-	def loads():
-		return json.loads(jsn)	
-	def setCaddr(Caddr):
-		self.pd['caddr'] = caddr
-	def setId(id):
-		self.pd['id'] = id
-	def setStatus(status):
-		self.pd['status'] = status
-	def setS(s):
-		self.pd['s'] = s
-		
-
 		
 class Receive(QThread):
 	def __init__(self, parent):
@@ -39,26 +18,38 @@ class Receive(QThread):
 		self.wait()
 		
 	def run(self):
-		d = dict()
-		while True:
-			buff = self.parent.sock.recv(1024).decode()
-			while buff.find('}') != -1:				
-				d = literal_eval(buff[:buff.find('}')+1])
-				buff = buff[buff.find('}')+1:]
-				for k, v in d.items():
-					if k == 'connect':
-						self.parent.model.appendRow(QStandardItem(str(v)))
-						self.parent.listView.setModel(self.parent.model)	
-						self.parent.textW.append("Enter. " + v )
-					elif k == 'disconnect':
-						print(self.parent.model.findItems(str(v))[0].row())					
-						self.parent.model.removeRow(self.parent.model.findItems(str(v))[0].row())
-						self.parent.textW.append("Leave. " + v )						
-					else:
-						self.parent.textW.append("From. " + str(k) + " : " + v)										
-					self.parent.bar.setValue(self.parent.bar.maximum())
-					self.parent.textW.viewport().update()
-					
+		d = dict()		
+		r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 'status':.+?, 's':.+?}")
+		buf = str()
+		while True:					
+			while r.search(buf) == None:
+				buf += self.parent.sock.recv(1024).decode()
+				print(buf)
+			#print("pass?")
+			msg = r.search(buf).group()
+			md = literal_eval(msg)			
+			buf = buf[r.search(buf).end():]
+			if md['status'] == "False":	
+				#print("pass2?")
+				break				
+			elif md['status'] == 'connect':
+				self.parent.model.appendRow(QStandardItem(md['s']))
+				self.parent.listView.setModel(self.parent.model)	
+				self.parent.textW.append("Enter. " + md['s'] )
+			elif md['status'] == 'disconnect':
+				#print(self.parent.model.findItems(md['s'])[0].row())					
+				self.parent.model.removeRow(self.parent.model.findItems(md['s'])[0].row())
+				self.parent.textW.append("Leave. " + md['s'] )						
+			elif md['status'] == 'text':
+				self.parent.textW.append("From. " + md['srcid'] + " : " + md['s'])										
+			self.parent.bar.setValue(self.parent.bar.maximum())
+			self.parent.textW.viewport().update()
+				
+		self.parent.err.showMessage(md['s'])
+		self.parent.err.accepted.connect(self.parent.close)
+		
+		#self.close()
+		#											
 					
 					
 class Enter(QDialog):
@@ -88,6 +79,7 @@ class Form(QMainWindow):
 		self.ent = Enter(self)
 	
 	def __Main__Init__(self):
+	
 		self.textW = QTextEdit(self)
 		self.textW.setGeometry(0, 0, 471, 401)
 		self.textW.setReadOnly(True)
@@ -100,7 +92,9 @@ class Form(QMainWindow):
 		self.lineEdit.setGeometry(0, 410, 471, 31)
 		
 		self.listView = QListView(self)
-		self.listView.setGeometry(480, 0, 141, 441)		
+		self.listView.setGeometry(480, 0, 141, 441)	
+
+		self.err = QErrorMessage(self)
 		
 		self.setGeometry(300, 200, 624, 482)		
 		self.setFixedSize(624, 482)
@@ -111,22 +105,30 @@ class Form(QMainWindow):
 		self.model = QStandardItemModel()		
 		
 		self.sock = socket()
-		self.sock.connect(('180.228.77.83', 1036))
-		self.sock.sendall(self.id.encode())
-		if self.sock.recv(1024).decode() == "False":
-			self.err = QErrorMessage(self)
-			self.err.showMessage("Id 중복 Error!")
-			#self.close()
-			self.err.accepted.connect(self.close)
+		self.sock.connect(('127.0.0.1', 1036))
+		
+		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', 'connect', self.id)
+		self.sock.sendall(self.p.DictoS().encode())
+		
+		#global r
+		#buf = str()
+		#while r.search(buf) == None:
+		#	buf += self.sock.recv(1024).decode()
+		#msg = r.search(buf).group()
+		#md = literal_eval(msg)
+		#buf = buf[r.search(buf).end():]		
+
 		self.rec = Receive(self)
 		self.rec.start()
 		
 	def send(self):
-		if self.listView.selectedIndexes():			
-			self.sock.sendall(("{'" +self.model.itemData(self.listView.selectedIndexes()[0])[0] + "' : '" + self.lineEdit.text() + "'}").encode())
+		if self.listView.selectedIndexes():
+			p = Packet('', self.id, '', self.model.itemData(self.listView.selectedIndexes()[0])[0], 'text', self.lineEdit.text())
+			self.sock.sendall(p.DictoS().encode())
 			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
 		else:
-			self.sock.sendall(("{'BroadCast' : '" + self.lineEdit.text() + "'}").encode())
+			p = Packet('', self.id, 'BroadCast', 'BroadCast', 'text', self.lineEdit.text())
+			self.sock.sendall(p.DictoS().encode())
 			self.textW.append("To. All User : " + self.lineEdit.text())
 		self.bar.setValue(self.bar.maximum())
 		self.lineEdit.setText("")		
