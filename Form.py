@@ -19,7 +19,7 @@ class Receive(QThread):
 		
 	def run(self):
 		d = dict()		
-		r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 'status':.+?, 's':.+?}")
+		r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 's':.+?, 'font':.+?, 'status':.+?}")
 		buf = str()
 		while True:					
 			while r.search(buf) == None:
@@ -31,23 +31,24 @@ class Receive(QThread):
 			buf = buf[r.search(buf).end():]
 			if md['status'] == "False":	
 				#print("pass2?")
+				self.parent.err_message = md['s']
 				break				
 			elif md['status'] == 'connect':
 				self.parent.model.appendRow(QStandardItem(md['s']))
 				self.parent.listView.setModel(self.parent.model)	
+				self.parent.textW.setFontFamily(QFont().defaultFamily())
 				self.parent.textW.append("Enter. " + md['s'] )
 			elif md['status'] == 'disconnect':
 				#print(self.parent.model.findItems(md['s'])[0].row())					
 				self.parent.model.removeRow(self.parent.model.findItems(md['s'])[0].row())
+				self.parent.textW.setFontFamily(QFont().defaultFamily())
 				self.parent.textW.append("Leave. " + md['s'] )						
 			elif md['status'] == 'text':
+				self.parent.textW.fromString(md['font'])
 				self.parent.textW.append("From. " + md['srcid'] + " : " + md['s'])										
 			self.parent.bar.setValue(self.parent.bar.maximum())
-			self.parent.textW.viewport().update()
-				
-		self.parent.err.showMessage(md['s'])
-		self.parent.err.accepted.connect(self.parent.close)
-		
+			self.parent.textW.viewport().update()			
+			
 		#self.close()
 		#											
 					
@@ -58,6 +59,7 @@ class Enter(QDialog):
 		self.parent = parent
 		#self.setGeometry(300, 200, 150, 30)
 		
+		self.setWindowTitle = "Input your name."
 		self.txtName = QLineEdit(self)
 		self.txtName.setGeometry(20, 10, 100, 20)
 
@@ -73,17 +75,26 @@ class Enter(QDialog):
 		self.close()
 		
 class Form(QMainWindow):
+	def setFont(self):
+		font, ok = QFontDialog.getFont()
+		if ok == True:
+			self.font = font
+	def setColor(self):
+		self.color = QColorDialog.getColor()
+		print(self.color)
 	def __init__(self):
 		super().__init__()
 		self.id = ""
 		self.ent = Enter(self)
 	
 	def __Main__Init__(self):
-	
+				
 		self.textW = QTextEdit(self)
 		self.textW.setGeometry(0, 0, 471, 401)
 		self.textW.setReadOnly(True)
-		self.textW.setLineWrapMode(False)
+		self.textW.setLineWrapMode(False)		
+		
+		self.font = QFont()		
 		
 		self.bar = QScrollBar(0x2, self)
 		self.textW.setVerticalScrollBar(self.bar)
@@ -92,9 +103,27 @@ class Form(QMainWindow):
 		self.lineEdit.setGeometry(0, 410, 471, 31)
 		
 		self.listView = QListView(self)
-		self.listView.setGeometry(480, 0, 141, 441)	
+		self.listView.setGeometry(480, 0, 141, 441)
+
+		self.btnFont = QPushButton('A', self)
+		self.btnFont.setGeometry(2, 449, 25, 25)	
+		f = QFont('Courier New', 10, -1, True)
+		f.setBold(True)
+		f.setUnderline(True)
+		self.btnFont.setFont(f)		
+		self.btnFont.clicked.connect(self.setFont)
+				
+		c = QColor(0, 0, 0)
+		self.fColor = QFrame(self)
+		self.fColor.setFrameShape(QFrame.StyledPanel)
+		self.fColor.setFrameShadow(QFrame.Sunken)		
+		self.fColor.setStyleSheet("QFrame { background-color: rgb(0, 0, 0) }")
+		self.fColor.setGeometry(32, 452, 20, 20)
+		self.fColor.clicked.connect(self.setColor)
+		
 
 		self.err = QErrorMessage(self)
+		self.err_message = str()
 		
 		self.setGeometry(300, 200, 624, 482)		
 		self.setFixedSize(624, 482)
@@ -106,8 +135,9 @@ class Form(QMainWindow):
 		
 		self.sock = socket()
 		self.sock.connect(('127.0.0.1', 1036))
+		#self.sock.connect(('180.228.77.83', 1036))
 		
-		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', 'connect', self.id)
+		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', self.id, '', 'connect')
 		self.sock.sendall(self.p.DictoS().encode())
 		
 		#global r
@@ -120,19 +150,25 @@ class Form(QMainWindow):
 
 		self.rec = Receive(self)
 		self.rec.start()
-		
+		self.rec.finished.connect(self.err_show)	
+				
 	def send(self):
 		if self.listView.selectedIndexes():
-			p = Packet('', self.id, '', self.model.itemData(self.listView.selectedIndexes()[0])[0], 'text', self.lineEdit.text())
+			p = Packet('', self.id, '', self.model.itemData(self.listView.selectedIndexes()[0])[0], self.lineEdit.text(), self.font.toString(), 'text')
 			self.sock.sendall(p.DictoS().encode())
-			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())
+			self.textW.setCurrentFont(self.font)
+			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())			
 		else:
-			p = Packet('', self.id, 'BroadCast', 'BroadCast', 'text', self.lineEdit.text())
+			p = Packet('', self.id, 'BroadCast', 'BroadCast', self.lineEdit.text(), self.font.toString(), 'text')
 			self.sock.sendall(p.DictoS().encode())
+			self.textW.setCurrentFont(self.font)
 			self.textW.append("To. All User : " + self.lineEdit.text())
 		self.bar.setValue(self.bar.maximum())
-		self.lineEdit.setText("")		
-
+		self.lineEdit.setText("")	
+		
+	def err_show(self):
+		self.err.showMessage(self.err_message)
+		self.err.accepted.connect(self.close)
 if __name__ == '__main__':
 	app = QApplication(sys.argv)	
 	w = Form()
