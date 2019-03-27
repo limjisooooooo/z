@@ -8,7 +8,7 @@ import re
 
 def Server(con, caddr):		
 	#msg = dict()	
-	r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 's':.+?, 'font':.+?, 'status':.+?}")
+	r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 's':.+?, 'font':.+?, 'fcolor':.+?, 'status':.+?}")
 	id = str()
 	while True:		
 		try:
@@ -53,7 +53,7 @@ def Server(con, caddr):
 			#print("엥 왜 실행?")
 			for c in d.values():
 				try:
-					p = Packet('', '', '', '', id, '', 'disconnect') 
+					p = Packet('', '', '', '', id, '', 0, 'disconnect') 
 					c.sendall(p.DictoS().encode())
 				except:
 					continue

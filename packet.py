@@ -1,7 +1,7 @@
 import ast
 
 class Packet:
-	def __init__(self, srcaddr = None, srcid = None, dstaddr = None, dstid = None, s = None, font = None, status = None, str = None):
+	def __init__(self, srcaddr = None, srcid = None, dstaddr = None, dstid = None, s = None, font = None, fcolor = None, status = None, str = None):
 		self.pd = dict()		
 		self.pd['srcaddr'] = srcaddr
 		self.pd['srcid'] = srcid
@@ -9,6 +9,7 @@ class Packet:
 		self.pd['dstid'] = dstid		
 		self.pd['s'] = s
 		self.pd['font'] = font
+		self.pd['fcolor'] = fcolor
 		self.pd['status'] = status
 		self.str = str
 	def StoDic(self):
@@ -25,8 +26,10 @@ class Packet:
 		self.pd['dstid'] = dstid		
 	def setS(self, s):
 		self.pd['s'] = s	
-	def setS(self, font):
+	def setfont(self, font):
 		self.pd['font'] = font
+	def setfcolr(self, fcolor):
+		self.pd['fcolor'] = fcolor
 	def setStatus(self, status):
 		self.pd['status'] = status
 

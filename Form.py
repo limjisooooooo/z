@@ -19,7 +19,7 @@ class Receive(QThread):
 		
 	def run(self):
 		d = dict()		
-		r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 's':.+?, 'font':.+?, 'status':.+?}")
+		r = re.compile("{'srcaddr':.+?, 'srcid':.+?, 'dstaddr':.+?, 'dstid':.+?, 's':.+?, 'font':.+?, 'fcolor':.+?, 'status':.+?}")
 		buf = str()
 		while True:					
 			while r.search(buf) == None:
@@ -37,14 +37,19 @@ class Receive(QThread):
 				self.parent.model.appendRow(QStandardItem(md['s']))
 				self.parent.listView.setModel(self.parent.model)	
 				self.parent.textW.setFontFamily(QFont().defaultFamily())
+				self.parent.textW.setTextColor(QColor.fromRgb(0))
 				self.parent.textW.append("Enter. " + md['s'] )
 			elif md['status'] == 'disconnect':
 				#print(self.parent.model.findItems(md['s'])[0].row())					
 				self.parent.model.removeRow(self.parent.model.findItems(md['s'])[0].row())
 				self.parent.textW.setFontFamily(QFont().defaultFamily())
+				self.parent.textW.setTextColor(QColor.fromRgb(0))
 				self.parent.textW.append("Leave. " + md['s'] )						
 			elif md['status'] == 'text':
-				self.parent.textW.fromString(md['font'])
+				font = QFont()
+				font.fromString(md['font'])
+				self.parent.textW.setFont(font)
+				self.parent.textW.setTextColor(QColor.fromRgb(md['fcolor']))
 				self.parent.textW.append("From. " + md['srcid'] + " : " + md['s'])										
 			self.parent.bar.setValue(self.parent.bar.maximum())
 			self.parent.textW.viewport().update()			
@@ -52,7 +57,21 @@ class Receive(QThread):
 		#self.close()
 		#											
 					
-					
+class cFrame(QFrame):
+	def __init__(self, parent):
+		super().__init__(parent)
+		self.parent = parent	
+		self.color = QColor()
+		self.setFrameShape(QFrame.StyledPanel)
+		self.setFrameShadow(QFrame.Sunken)		
+		self.setStyleSheet("QFrame { background-color: rgb(0, 0, 0) }")		
+	def mouseDoubleClickEvent(self, event):
+		self.color = QColorDialog.getColor()
+		self.r, self.g, self.b, self.a = self.color.getRgb()
+		self.setStyleSheet("QFrame { background-color: rgb(" + str(self.r) + ", " +  str(self.g) + ", " +  str(self.b) + ")}")		
+	def Color(self):
+		return self.color
+	
 class Enter(QDialog):
 	def __init__(self, parent):
 		super().__init__()
@@ -79,9 +98,7 @@ class Form(QMainWindow):
 		font, ok = QFontDialog.getFont()
 		if ok == True:
 			self.font = font
-	def setColor(self):
-		self.color = QColorDialog.getColor()
-		print(self.color)
+			
 	def __init__(self):
 		super().__init__()
 		self.id = ""
@@ -112,14 +129,9 @@ class Form(QMainWindow):
 		f.setUnderline(True)
 		self.btnFont.setFont(f)		
 		self.btnFont.clicked.connect(self.setFont)
-				
-		c = QColor(0, 0, 0)
-		self.fColor = QFrame(self)
-		self.fColor.setFrameShape(QFrame.StyledPanel)
-		self.fColor.setFrameShadow(QFrame.Sunken)		
-		self.fColor.setStyleSheet("QFrame { background-color: rgb(0, 0, 0) }")
-		self.fColor.setGeometry(32, 452, 20, 20)
-		self.fColor.clicked.connect(self.setColor)
+		
+		self.frmColor = cFrame(self)
+		self.frmColor.setGeometry(32, 452, 20, 20)		
 		
 
 		self.err = QErrorMessage(self)
@@ -137,7 +149,7 @@ class Form(QMainWindow):
 		self.sock.connect(('127.0.0.1', 1036))
 		#self.sock.connect(('180.228.77.83', 1036))
 		
-		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', self.id, '', 'connect')
+		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', self.id, '', 0, 'connect')
 		self.sock.sendall(self.p.DictoS().encode())
 		
 		#global r
@@ -154,14 +166,16 @@ class Form(QMainWindow):
 				
 	def send(self):
 		if self.listView.selectedIndexes():
-			p = Packet('', self.id, '', self.model.itemData(self.listView.selectedIndexes()[0])[0], self.lineEdit.text(), self.font.toString(), 'text')
+			p = Packet('', self.id, '', self.model.itemData(self.listView.selectedIndexes()[0])[0], self.lineEdit.text(), self.font.toString(), self.frmColor.Color().rgb(), 'text')
 			self.sock.sendall(p.DictoS().encode())
 			self.textW.setCurrentFont(self.font)
+			self.textW.setTextColor(self.frmColor.Color())
 			self.textW.append("To. " + self.model.itemData(self.listView.selectedIndexes()[0])[0] + " : " + self.lineEdit.text())			
 		else:
-			p = Packet('', self.id, 'BroadCast', 'BroadCast', self.lineEdit.text(), self.font.toString(), 'text')
+			p = Packet('', self.id, 'BroadCast', 'BroadCast', self.lineEdit.text(), self.font.toString(), self.frmColor.Color().rgb(), 'text')
 			self.sock.sendall(p.DictoS().encode())
 			self.textW.setCurrentFont(self.font)
+			self.textW.setTextColor(self.frmColor.Color())
 			self.textW.append("To. All User : " + self.lineEdit.text())
 		self.bar.setValue(self.bar.maximum())
 		self.lineEdit.setText("")	
@@ -169,6 +183,7 @@ class Form(QMainWindow):
 	def err_show(self):
 		self.err.showMessage(self.err_message)
 		self.err.accepted.connect(self.close)
+		
 if __name__ == '__main__':
 	app = QApplication(sys.argv)	
 	w = Form()
