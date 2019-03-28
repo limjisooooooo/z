@@ -1,11 +1,13 @@
 import sys
 import json
 import re
+import base64
 from packet import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from socket import *
 from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QUrl
 from ast import *
 from time import *
 		
@@ -25,38 +27,38 @@ class Receive(QThread):
 			while r.search(buf) == None:
 				buf += self.parent.sock.recv(1024).decode()
 				print(buf)
-			#print("pass?")
+			
 			msg = r.search(buf).group()
 			md = literal_eval(msg)			
 			buf = buf[r.search(buf).end():]
-			if md['status'] == "False":	
-				#print("pass2?")
+			if md['status'] == "False":				
 				self.parent.err_message = md['s']
 				break				
+			
 			elif md['status'] == 'connect':
 				self.parent.model.appendRow(QStandardItem(md['s']))
 				self.parent.listView.setModel(self.parent.model)	
-				self.parent.textW.setFontFamily(QFont().defaultFamily())
+				font = QFont()
+				font.fromString(md['font'])
+				self.parent.textW.setCurrentFont(font)
 				self.parent.textW.setTextColor(QColor.fromRgb(0))
 				self.parent.textW.append("Enter. " + md['s'] )
-			elif md['status'] == 'disconnect':
-				#print(self.parent.model.findItems(md['s'])[0].row())					
+			
+			elif md['status'] == 'disconnect':				
 				self.parent.model.removeRow(self.parent.model.findItems(md['s'])[0].row())
-				self.parent.textW.setFontFamily(QFont().defaultFamily())
+				font = QFont()
+				font.fromString(md['font'])
+				self.parent.textW.setCurrentFont(font)				
 				self.parent.textW.setTextColor(QColor.fromRgb(0))
 				self.parent.textW.append("Leave. " + md['s'] )						
+			
 			elif md['status'] == 'text':
 				font = QFont()
 				font.fromString(md['font'])
-				self.parent.textW.setFont(font)
+				self.parent.textW.setCurrentFont(font)
 				self.parent.textW.setTextColor(QColor.fromRgb(md['fcolor']))
-				self.parent.textW.append("From. " + md['srcid'] + " : " + md['s'])										
-			self.parent.bar.setValue(self.parent.bar.maximum())
-			self.parent.textW.viewport().update()			
+				self.parent.textW.append("From. " + md['srcid'] + " : " + md['s'])												
 			
-		#self.close()
-		#											
-					
 class cFrame(QFrame):
 	def __init__(self, parent):
 		super().__init__(parent)
@@ -64,11 +66,13 @@ class cFrame(QFrame):
 		self.color = QColor()
 		self.setFrameShape(QFrame.StyledPanel)
 		self.setFrameShadow(QFrame.Sunken)		
-		self.setStyleSheet("QFrame { background-color: rgb(0, 0, 0) }")		
+		self.setStyleSheet("QFrame { background-color: rgb(0, 0, 0) }")
+		
 	def mouseDoubleClickEvent(self, event):
 		self.color = QColorDialog.getColor()
 		self.r, self.g, self.b, self.a = self.color.getRgb()
-		self.setStyleSheet("QFrame { background-color: rgb(" + str(self.r) + ", " +  str(self.g) + ", " +  str(self.b) + ")}")		
+		self.setStyleSheet("QFrame { background-color: rgb(" + str(self.r) + ", " +  str(self.g) + ", " +  str(self.b) + ")}")
+		
 	def Color(self):
 		return self.color
 	
@@ -94,10 +98,21 @@ class Enter(QDialog):
 		self.close()
 		
 class Form(QMainWindow):
+	def setScroll(self):
+		self.textW.verticalScrollBar().setValue(self.textW.verticalScrollBar().maximum())		
+	
 	def setFont(self):
 		font, ok = QFontDialog.getFont()
 		if ok == True:
 			self.font = font
+	
+	def fopen(self):
+		FileName, Filter = QFileDialog.getOpenFileUrl()		
+		if FileName.path() != "":
+			f = open(FileName.path()[1:], 'rb')
+			data = base64.b64encode(f.read())
+			self.textW.append("<img src='data:image/jpeg;base64, " + data.decode() + "'/>")
+			f.close()
 			
 	def __init__(self):
 		super().__init__()
@@ -106,15 +121,13 @@ class Form(QMainWindow):
 	
 	def __Main__Init__(self):
 				
-		self.textW = QTextEdit(self)
+		self.textW = QTextBrowser(self)
 		self.textW.setGeometry(0, 0, 471, 401)
 		self.textW.setReadOnly(True)
-		self.textW.setLineWrapMode(False)		
+		self.textW.setLineWrapMode(QTextEdit.WidgetWidth)
+		self.textW.verticalScrollBar().rangeChanged.connect(self.setScroll)				
 		
 		self.font = QFont()		
-		
-		self.bar = QScrollBar(0x2, self)
-		self.textW.setVerticalScrollBar(self.bar)
 		
 		self.lineEdit = QLineEdit(self)
 		self.lineEdit.setGeometry(0, 410, 471, 31)
@@ -133,7 +146,10 @@ class Form(QMainWindow):
 		self.frmColor = cFrame(self)
 		self.frmColor.setGeometry(32, 452, 20, 20)		
 		
-
+		self.btnFile = QPushButton(self)
+		self.btnFile.setGeometry(59, 449, 25, 25)
+		self.btnFile.clicked.connect(self.fopen)
+		
 		self.err = QErrorMessage(self)
 		self.err_message = str()
 		
@@ -147,18 +163,9 @@ class Form(QMainWindow):
 		
 		self.sock = socket()
 		self.sock.connect(('127.0.0.1', 1036))
-		#self.sock.connect(('180.228.77.83', 1036))
 		
-		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', self.id, '', 0, 'connect')
+		self.p = Packet('', self.id, 'BroadCast', 'BroadCast', self.id, self.textW.font().toString(), 0, 'connect')
 		self.sock.sendall(self.p.DictoS().encode())
-		
-		#global r
-		#buf = str()
-		#while r.search(buf) == None:
-		#	buf += self.sock.recv(1024).decode()
-		#msg = r.search(buf).group()
-		#md = literal_eval(msg)
-		#buf = buf[r.search(buf).end():]		
 
 		self.rec = Receive(self)
 		self.rec.start()
@@ -177,7 +184,6 @@ class Form(QMainWindow):
 			self.textW.setCurrentFont(self.font)
 			self.textW.setTextColor(self.frmColor.Color())
 			self.textW.append("To. All User : " + self.lineEdit.text())
-		self.bar.setValue(self.bar.maximum())
 		self.lineEdit.setText("")	
 		
 	def err_show(self):

@@ -53,7 +53,7 @@ def Server(con, caddr):
 			#print("엥 왜 실행?")
 			for c in d.values():
 				try:
-					p = Packet('', '', '', '', id, '', 0, 'disconnect') 
+					p = Packet('', '', '', '', id, 'Gulim,9,-1,5,50,0,0,0,0,0', 0, 'disconnect') 
 					c.sendall(p.DictoS().encode())
 				except:
 					continue
